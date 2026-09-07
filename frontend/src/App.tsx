@@ -10,8 +10,8 @@ import {
 } from "@/lib/financial-types";
 import { computeKPIs, computeMonthlyData } from "@/lib/financial-utils";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
-
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8001";
+  
 async function fetchFinancialData(): Promise<FinancialMovement[]> {
   const response = await fetch(`${API_BASE_URL}/api/metrics`);
   if (!response.ok) {
