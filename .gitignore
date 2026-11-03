@@ -37,6 +37,11 @@ backend/htmlcov/
 backend/.venv/
 backend/venv/
 
+# Python caches outside backend/ (running the validation evidence
+# under .agents/rules/_validation/ leaves a __pycache__ behind)
+.agents/**/__pycache__/
+.agents/**/*.pyc
+
 # Build / runtime artifacts
 *.pid
 *.seed
