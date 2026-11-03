@@ -46,6 +46,9 @@ The following checks were run against this checkout while preparing this snapsho
 - Relocated frontend evidence probes: **2 files, 7 tests** with `npx vitest run --dir ../.agents/rules/_validation` from `frontend/`.
 - `npx tsc --noEmit -p tsconfig.app.json`, `npx tsc -b`, and `npx eslint .` passed in the last recorded frontend verification.
 - The validation scripts report 25 R-rules and 8 C-conventions, with no missing rule IDs in their index.
+- `docker compose config --quiet` and `docker compose build` succeeded; both development services started with `docker compose up -d`.
+- Runtime smoke tests passed: backend `/health` returns `ok`; backend and Vite-proxied `/api/metrics` each return 360 movements; frontend `/` returns HTTP 200. The running backend image contains pytest 9.2.0 and debugpy 1.8.22.
+- `backend/.dockerignore` and `frontend/.dockerignore` exclude local dependencies, caches, and env files from image contexts. Their measured build contexts were about 898 B and 1.75 kB respectively.
 
 The two evidence tests are outside Vitest's `frontend/` root. A plain `npx vitest run` does **not** discover them; the explicit `--dir` command is required. Bare `npx tsc --noEmit` is not a valid project type-check here; use the app project or build command above.
 

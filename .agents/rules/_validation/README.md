@@ -35,6 +35,14 @@ All probes now live in this one folder. The two frontend tests are `.test.ts(x)`
 Set-Location C:\Users\chris\ai-eng-financial-dashboard-context
 python -m pytest .agents\rules\_validation\test_rules_validation.py -q
 
+# Docker build and runtime smoke test (requires Docker Desktop/daemon)
+docker compose config --quiet
+docker compose up --build -d
+(Invoke-RestMethod http://localhost:8001/health).status       # ok
+(Invoke-RestMethod http://localhost:8001/api/metrics).Count   # 360
+(Invoke-RestMethod http://localhost:5173/api/metrics).Count   # 360 via Vite proxy
+(Invoke-WebRequest http://localhost:5173/ -UseBasicParsing).StatusCode # 200
+
 # Individual probes
 python .agents\rules\_validation\val_docs_config.py
 python .agents\rules\_validation\val_r17_structure.py

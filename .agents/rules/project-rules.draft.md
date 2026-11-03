@@ -10,7 +10,7 @@ Evidence for every rule was gathered by static inspection on **2026-11-03**. Sta
 
 On **2026-11-03** the draft was checked against executable probes where feasible and against measured or read evidence where runtime execution was not possible; that pass corrected several entries. The evidence is reproducible and committed under [`_validation/`](./_validation/), with a README that lists every artefact and how to re-run it. A **"Validated"** bullet means the claim has supporting evidence, not necessarily a runtime test; the evidence-strength marker identifies whether it was **Executed**, **Measured**, **Read**, or **Not executable**. **"In practice"** is guidance derived from a repository fact rather than a separate measurement.
 
-The current coverage audit finds that **all 25 R-rules carry a `Validated` bullet** and that all 8 C-conventions are present in the table. `_validation/val_rule_coverage.py` checks R-rule marker presence and ID/index consistency; it does not certify runtime execution or measure C-convention evidence depth. The report identifies **four R-rules (R4, R5, R9, R10) that could not be validated by execution** in that pass. Other evidence includes executed tests, mechanical measurements, and source reads; the distinction is marked per rule rather than averaged away.
+The current coverage audit finds that **all 25 R-rules carry a `Validated` bullet** and that all 8 C-conventions are present in the table. `_validation/val_rule_coverage.py` checks R-rule marker presence and ID/index consistency; it does not certify runtime execution or measure C-convention evidence depth. CORS behavior (R4) and cold-start failure behavior (R5) were not exercised. Docker image builds (R9, R10) have since completed, though one successful build does not prove reproducibility. Other evidence includes executed tests, mechanical measurements, and source reads; the distinction is marked per rule rather than averaged away.
 
 **Evidence strength.** Not all rules could be tested to the same depth, and the markers say which is which:
 
@@ -356,12 +356,12 @@ Applies when changing a Dockerfile, a build context, a dependency file, or expos
 ### R8 — Every build context must exclude host-only content
 
 - **Status:** PROPOSED · **Severity:** Low
-- **Scope:** `.dockerignore`, `backend/.dockerignore`, `frontend/.dockerignore`, `frontend/Dockerfile`, `backend/Dockerfile`
+- **Scope:** `backend/.dockerignore`, `frontend/.dockerignore`, `frontend/Dockerfile`, `backend/Dockerfile`
 - **Rule:** Git ignore rules do not apply to Docker.
-- **Why:** neither build context has a `.dockerignore` while both Dockerfiles run `COPY . .`. Host-only content is therefore eligible to enter the image, including a local `frontend/.env`/`.env.*` that the root `.gitignore` excludes from Git.
-- **Validated — the original evidence was wrong, and the rule got stronger:** the draft said "the local `frontend/node_modules` is currently empty, so no contamination exists today". It is **not** empty: a local install was performed during validation and `frontend/` now holds **16,507 `node_modules` entries out of 16,553 total**. The exposure is live, not latent — the frontend build context would ship the entire host install. Checking the number rather than assuming it is what turned a theoretical rule into a present one.
+- **Why:** `.gitignore` does not filter Docker build contexts. Both Dockerfiles use `COPY . .`, so every local-only file must be excluded by the corresponding context's `.dockerignore`; Compose bind mounts are a separate runtime boundary.
+- **Validated — the original evidence was wrong, then the context was secured:** the earlier draft said `frontend/node_modules` was empty; it held **16,507 of 16,553** entries. Before the ignore files were added, those host dependencies entered the build context. The new frontend and backend `.dockerignore` files exclude dependencies, caches, and local env files; the measured contexts fell to **1.75 kB** and **898 B**, and both images built successfully.
 - **Validated — scope narrowed, because a `.dockerignore` alone does not fix this:** `docker-compose.yml` bind-mounts `./frontend:/app` and `./backend:/app`. A bind mount overlays the image's `/app` at container start, so **host files reach the container regardless of any `.dockerignore`**. For the Compose workflow this repository actually uses, `.dockerignore` protects only the image layer, not the running container. The real remedy for `.env` exposure in Compose is to not place secrets in bind-mounted paths, or to mount explicitly per-file.
-- **In practice:** `.gitignore` protects the repository, the `.dockerignore` would protect the image, and neither protects a bind-mounted container. See C6 for the Git side of this.
+- **In practice:** `.gitignore` protects the repository and `.dockerignore` protects the image build context, but neither filters a bind-mounted container. Compose mounts `./frontend:/app` and `./backend:/app`; do not store secrets in those mounted paths. See C6 for the Git side.
 
 ### R9 — Image builds must consume the committed lockfile
 
@@ -371,6 +371,7 @@ Applies when changing a Dockerfile, a build context, a dependency file, or expos
 - **Why:** a lockfile is committed, but the image runs `npm install`, which may rewrite or relax the resolution instead of asserting the committed tree, so container builds and local installs can diverge without any repository change.
 - **In practice:** the lockfile's value depends on the build asserting it. `npm ci` is the command that reads it rather than resolves it.
 - **Validated:** `package-lock.json` is present and `frontend/Dockerfile` runs `RUN npm install` with no `npm ci` anywhere in the file. Container and local dependency resolution can diverge with no repository change, as stated.
+- **Validated — image build executed:** `docker compose build` completed and the frontend container reports its installed top-level dependency tree with `npm ls --depth=0`. This proves the current build works, not that repeated clean builds are byte-for-byte reproducible; the Dockerfile still uses `npm install`, not `npm ci`.
 
 ### R10 — Runtime images must not carry test and debugger tooling
 
@@ -380,6 +381,7 @@ Applies when changing a Dockerfile, a build context, a dependency file, or expos
 - **Why:** the single requirements file lists `pytest`, `pytest-cov`, `httpx`, and `debugpy`, and the Dockerfile installs it directly, so test tooling and a debugger are part of the runtime layer that starts Uvicorn under debugpy.
 - **In practice:** this is why a real deployment needs a split between runtime and development dependency sets, and why the debugger port is published in the same service as the API.
 - **Validated — one fact stronger than written:** `requirements.txt` is **entirely unpinned**. All six entries (`fastapi`, `uvicorn[standard]`, `debugpy`, `pytest`, `pytest-cov`, `httpx`) carry no version specifier, so the runtime layer is not reproducible either. This is a separate concern from the dev/runtime split and deserves its own fix.
+- **Validated — container contents inspected:** after the Compose build, `docker compose exec backend python -m pytest --version` reports **pytest 9.2.0** and `python -m debugpy --version` reports **1.8.22**. Both development tools are installed in the running backend image, as the rule predicts.
 
 ---
 

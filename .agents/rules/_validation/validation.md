@@ -50,7 +50,7 @@ The coverage result is marker coverage, not runtime coverage. The script found 2
 | Rule | What the run showed |
 | --- | --- |
 | **R2** | Environment-dependent. Under `Europe/Rome` **0 of 4** probe dates produce the wrong month key; under `America/Los_Angeles` **3 of 4** do. On this machine the bug is invisible — which is why it survived review. |
-| **R8** | Evidence was factually wrong. `frontend/node_modules` was reported "empty"; it holds **16,507 of 16,553** entries after a local install. Scope also narrowed: Compose bind-mounts `./frontend:/app`, so `.dockerignore` protects the image layer but **not** the running container. |
+| **R8** | Evidence was factually wrong: `frontend/node_modules` was reported "empty" but held **16,507 of 16,553** entries. At the original audit, neither image context had a `.dockerignore`; this follow-up added both, reducing measured contexts to **1.75 kB** (frontend) and **898 B** (backend), and both images built. Compose still bind-mounts `./frontend:/app`, so ignores protect the image context but **not** files exposed through the running container mount. |
 | **R17** | Declaration count wrong: **32**, not 35 (6 `ClassDef` + 20 `FunctionDef` + 6 module assignments; imports excluded). |
 | **R18** | Total and breakdown both wrong. **108** substring occurrences, not 91; **83** whole-word; split is backend **33** / `lib` **54** / `components` **18** / `App.tsx` **3**, not 31/47/12. |
 | **R21** | Too broad. "A `.test.tsx` today would fail at import time" holds only for `@testing-library/*`. `react-dom/server` is already installed and runs in the plain Node environment, so **markup** tests work with no new dependency — 3 passing. Only **interaction** tests are genuinely blocked. |
@@ -84,15 +84,17 @@ This invalidated an earlier result in this very pass: a probe appeared to pass a
 
 ## What could not be validated
 
-Stated plainly rather than averaged into the coverage number.
+## What remains unvalidated
 
-| Rule | Why it cannot be executed here |
+Stated plainly rather than averaged into the coverage number. Docker is now available and both development images have been built and started; this follow-up narrows the remaining limits.
+
+| Rule | What remains unvalidated |
 | --- | --- |
 | **R4** (CORS) | Proving an origin is actually rejected requires a browser and a deployed origin. Only the literal configuration was read from source. |
 | **R5** (cold start / no healthcheck) | Requires killing the backend mid-request. Reproducible only by changing the running system, which this pass does not do. |
-| **R9, R10** (image build) | `docker` was not exercised; the lockfile and pinning facts were read from the files. |
+| **R9** (dependency reproducibility) | The Compose build succeeded using `npm install`, and the frontend dependency tree was inspected. A single successful build does not prove that repeated clean builds resolve identically; the Dockerfile still does not use `npm ci`. |
 
-Everything else in the table above rests on a run: a status code, a rendered payload, a compile error, a parsed AST, or a counted occurrence. Where a rule rests only on reading, its entry in the draft says so.
+R10 is no longer in this section: the backend image was built and inspected, and the running container reports pytest 9.2.0 and debugpy 1.8.22. Other rule entries distinguish executed checks from measured or source-read evidence.
 
 ---
 
@@ -141,9 +143,18 @@ npx vitest run --dir ../.agents/rules/_validation        # expect 2 files, 7 tes
 npx tsc --noEmit -p tsconfig.app.json
 npx tsc -b
 npx eslint .
+
+# Docker build and runtime smoke test (requires Docker Desktop/daemon)
+Set-Location C:\Users\chris\ai-eng-financial-dashboard-context
+docker compose config --quiet
+docker compose up --build -d
+(Invoke-RestMethod http://localhost:8001/health).status       # ok
+(Invoke-RestMethod http://localhost:8001/api/metrics).Count   # 360
+(Invoke-RestMethod http://localhost:5173/api/metrics).Count   # 360 via Vite proxy
+(Invoke-WebRequest http://localhost:5173/ -UseBasicParsing).StatusCode # 200
 ```
 
-**State at the end of the pass:** backend `6 passed, 6 xfailed` · frontend product suite `1 file, 5 tests` · frontend probes `2 files, 7 tests` · `tsc -p tsconfig.app.json`, `tsc -b`, `eslint` all exit 0 · no dangling probe references · `verification.md` and `rules-proposed.md` untouched · no product code modified.
+**State after the Docker follow-up:** backend `15 passed` · validation suite `6 passed, 6 xfailed` · frontend product suite `1 file, 5 tests` · frontend probes `2 files, 7 tests` · type-checks and lint pass · all ten validation scripts exit 0. `docker compose build` succeeds; both services run; `/health` returns `ok`, backend and Vite-proxied `/api/metrics` each return 360 movements, and the frontend returns HTTP 200. `verification.md` and `rules-proposed.md` remain untouched; application source was not modified.
 
 ---
 

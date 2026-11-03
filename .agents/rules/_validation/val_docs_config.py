@@ -94,23 +94,36 @@ dockerignores = {
     str(p.relative_to(ROOT)): p.exists()
     for p in (ROOT / ".dockerignore", ROOT / "backend" / ".dockerignore", ROOT / "frontend" / ".dockerignore")
 }
+backend_ignore = set(read(ROOT / "backend" / ".dockerignore").splitlines())
+frontend_ignore = set(read(ROOT / "frontend" / ".dockerignore").splitlines())
 copy_all = {
     name: bool(re.search(r"COPY\s+\.\s+\.", read(ROOT / name)))
     for name in ("backend/Dockerfile", "frontend/Dockerfile")
 }
 gitignore = read(ROOT / ".gitignore")
 env_gitignored = [ln for ln in gitignore.splitlines() if ".env" in ln]
+required_backend_excludes = {"__pycache__/", "*.py[cod]", ".pytest_cache/", ".env", ".env.*"}
+required_frontend_excludes = {"node_modules/", "dist/", "coverage/", ".env", ".env.*"}
 check(
     "R8",
-    "No .dockerignore exists while both Dockerfiles COPY the whole context",
-    not any(dockerignores.values()) and all(copy_all.values()),
-    f"dockerignore present: {dockerignores}; COPY . .: {copy_all}",
+    "Both Docker build contexts exclude local dependencies, caches, and env files",
+    dockerignores["backend\\.dockerignore"]
+    and dockerignores["frontend\\.dockerignore"]
+    and required_backend_excludes.issubset(backend_ignore)
+    and required_frontend_excludes.issubset(frontend_ignore)
+    and all(copy_all.values()),
+    f"backend exclusions present = {required_backend_excludes.issubset(backend_ignore)}; "
+    f"frontend exclusions present = {required_frontend_excludes.issubset(frontend_ignore)}; "
+    f"COPY . . = {copy_all}",
 )
 check(
     "R8",
-    "frontend .env files are excluded from Git but eligible for the build context",
-    bool(env_gitignored),
-    f".gitignore .env rules = {env_gitignored or 'none'}",
+    "Frontend local env files are excluded from Git and Docker while the example remains included",
+    bool(env_gitignored)
+    and {".env", ".env.*", "!.env.example"}.issubset(frontend_ignore),
+    f".gitignore .env rules = {env_gitignored or 'none'}; "
+    f"frontend .dockerignore env rules = "
+    f"{sorted(entry for entry in frontend_ignore if entry.startswith('!') or entry == '.env' or entry.startswith('.env.'))}",
 )
 
 # ---------------------------------------------------------------- R9
