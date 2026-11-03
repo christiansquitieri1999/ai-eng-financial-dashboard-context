@@ -8,6 +8,7 @@ VERDICT. Run from the repository root:
 import re
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parents[3]
 results: list[tuple[str, str, bool]] = []
@@ -153,11 +154,15 @@ vite_config = read(ROOT / "frontend" / "vite.config.ts")
 # The file uses double quotes; accept either so the check does not depend on style.
 proxy_target = re.search(r"""target:\s*['"]([^'"]+)['"]""", vite_config)
 target = proxy_target.group(1) if proxy_target else "none"
+target_host = urlparse(target).hostname
+has_backend_service = bool(re.search(r"(?m)^\s{2}backend:\s*$", compose))
+publishes_backend = ("8001", "8000") in compose_ports
 check(
     "R16",
-    "The Vite proxy target is a Compose-internal hostname, unresolvable from the host",
-    "backend" in target and "localhost" not in target,
-    f"vite proxy target = {target}",
+    "The Vite proxy uses the Compose service address, distinct from the host-published backend port",
+    target_host == "backend" and has_backend_service and publishes_backend,
+    f"vite proxy target = {target}; backend service declared = {has_backend_service}; "
+    f"host publishes 8001:8000 = {publishes_backend}",
 )
 
 # ---------------------------------------------------------------- C6 / C7

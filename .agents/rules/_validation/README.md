@@ -1,6 +1,6 @@
 # Validation evidence
 
-These files are **not rules**. They are the reproducible proof behind the `**Validated:**` markers in `../project-rules.draft.md`. Every rule in that draft is supposed to cite a real, executed artefact; this folder holds those artefacts so a reviewer can re-run them instead of trusting prose.
+These files are **not rules**. They hold the reproducible evidence behind claims in `../project-rules.draft.md`: executed tests where feasible, and measured or source-read checks where runtime execution is not appropriate or available. Re-run the artefacts instead of relying on prose alone; see `validation.md` for evidence-strength limits.
 
 If a probe and the draft disagree, the probe is right and the draft needs correcting. That has already happened several times during this validation pass — see "Corrections found by validating" below.
 

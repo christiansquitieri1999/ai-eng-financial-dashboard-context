@@ -1,6 +1,6 @@
 # Validation report
 
-**What this is.** The narrative report of the validation pass run on 2026-11-04, in which every rule in [`project-rules.draft.md`](../project-rules.draft.md) was put through a real executed task instead of being confirmed by reading alone. It records the verdict per rule, the rules the run proved wrong, what could not be validated in this environment, and the two tooling traps that make naive verification lie.
+**What this is.** The narrative report of the validation pass recorded on 2026-11-03. It compares each rule in [`project-rules.draft.md`](../project-rules.draft.md) with the strongest available evidence: executed probes where feasible, and measured or source-read evidence where runtime execution was not possible. It records the verdict per rule, corrections, validation limits, and tooling traps.
 
 **What this is not.** It is not a rule list and not a defect backlog. It contains no corrective action and describes no approved change to the current snapshot. `backend/` and `frontend/src/` were not modified during this pass.
 
@@ -9,7 +9,7 @@
 | Document | Scope | Status |
 | --- | --- | --- |
 | [`verification.md`](../../../verification.md) | Project summary and integration gap analysis | Untouched — byte-identical to `6d58a42` |
-| [`rules-proposed.md`](../../../rules-proposed.md) | Authoritative rule record: full evidence, status key, open decisions | Untouched — "i file precedenti non devi aggiornarli" |
+| [`rules-proposed.md`](../../../rules-proposed.md) | Preserved original proposal: finding catalog, initial static evidence, status key, open decisions | Untouched — newer executed or measured evidence is recorded in this draft and report |
 | [`project-rules.draft.md`](../project-rules.draft.md) | The single consolidated guidance file | Working draft |
 | [`README.md`](README.md) | Technical index of the probe artefacts: what each file proves, how to re-run it | Index only |
 | **`validation.md`** (this file) | Verdict per rule, corrections, limits of the run | Report |
@@ -20,7 +20,7 @@ The distinction matters. `README.md` answers *"what does each probe do and how d
 
 ## Headline result
 
-**25 of 25 rules and 8 of 8 conventions carry executed evidence.** Verified mechanically by `val_rule_coverage.py`, not asserted:
+**All 25 R-rules have a `Validated` evidence bullet; all 8 C-conventions appear in the draft table.** The coverage script verifies marker presence and ID/index consistency; it does **not** prove that every item was exercised at runtime or audit the evidence strength of C-conventions.
 
 ```
 Rules found: 25 R-rules, 8 C-conventions
@@ -30,7 +30,7 @@ Rule IDs missing from the index: none
 Index IDs that name no rule: none
 ```
 
-That coverage number is itself an audit result, not a claim: the script found 24/25 on its first run, plus two marker conventions promised in the header and used nowhere. See "A defect found in this document" below.
+The coverage result is marker coverage, not runtime coverage. The script found 24/25 R-rules on its first run and two unused marker conventions promised in the header; the entries and header were corrected afterward. See "A defect found in this document" below. Four rules remain explicitly unvalidated by execution in this environment: R4, R5, R9, and R10.
 
 ### Verdict by rule
 
