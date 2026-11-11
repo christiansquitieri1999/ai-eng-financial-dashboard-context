@@ -129,6 +129,133 @@ The frontend types in `frontend/src/lib/financial-types.ts` describe movement re
 | Frontend tests, lint, and production build pass | **TO DEEP DIVE** | Scripts exist in `frontend/package.json`, but were not run. Run `npm test`, `npm run lint`, and `npm run build` from `frontend/`. |
 | Development startup has readiness handling and production hardening | **TO DEEP DIVE** | Compose only declares `depends_on`; CORS allows all origins and the containers run dev servers/reload. Production deployment requirements and security posture need separate decisions. |
 
+## Feature request from PM
+
+The PM has requested three features. This section documents the AS-IS backend API surface, the TO-BE requirements, and every mismatch found before writing specs. Findings below were resolved at the spec level.
+
+### Feature 1 — Date range filter on the home dashboard
+
+**PM requirement:**
+- Two date inputs (start date, end date) at the top of the dashboard.
+- Dates sent to API in `YYYY-MM-DD` format.
+- Both inputs optional; when empty, show all data.
+- Show available date range (min/max from facets) near the inputs.
+
+**AS-IS API — `GET /api/metrics/facets`**
+- Query params: none.
+- Response shape:
+  ```json
+  {
+    "operation_types": ["income", "outcome"],
+    "business_types": ["B2B", "B2C"],
+    "categories": ["administrative", "operational", "others", "sales", "suppliers"],
+    "min_date": "2025-11-03",
+    "max_date": "2026-10-28"
+  }
+  ```
+
+**AS-IS API — `GET /api/metrics`**
+- Query params: `start_date`, `end_date` (both optional, `YYYY-MM-DD` format), `category`, `operation_type`.
+- Response shape: `FinancialMovement[]` (list of `{ create_date, amount, operation_type, category, business_type }`).
+- The frontend currently calls this endpoint without any params and computes KPIs + monthly charts client-side.
+
+**Frontend AS-IS fetch pattern:**
+- `App.tsx` calls `fetchFinancialData()` which hits `${API_BASE_URL}/api/metrics` with no query params.
+- No date state, no facets fetch, no date inputs exist in the UI.
+- No router exists (`react-router-dom` is not in `package.json`).
+
+**Mismatches found (resolved in spec):**
+1. **PM wording says "filter all data currently displayed on the page"** — the dashboard currently computes everything client-side from raw movements. The spec must clarify that date filtering will be done by passing `start_date`/`end_date` to the API, not by filtering in the browser, so the backend does the work.
+2. **PM wording says "available date range must be shown near the inputs"** — facets endpoint returns `min_date` and `max_date`. The spec must call out that the frontend needs a separate `GET /api/metrics/facets` call to populate these hints. The current `facets` endpoint has no date filter itself (it always returns the full range), which is correct.
+3. **PM does not mention category/operation_type filters** — the API supports them, but the spec should ignore them for this feature.
+
+### Feature 2 — Anomaly alerts table on the home dashboard
+
+**PM requirement:**
+- Table below existing charts with columns: period, recorded outcome, rolling average of previous 3 periods, percentage increase.
+- Configurable threshold via numeric input (0.01 to 1.0, default 0.3).
+- Explicit empty state message when no anomalies detected.
+- Must respect date range from Feature 1 if active.
+
+**AS-IS API — `GET /api/metrics/alerts`**
+- Query params: `threshold` (default=0.3, ge=0), `group_by` (default="month"), `start_date`, `end_date`, `business_type`.
+- Response shape:
+  ```json
+  [
+    {
+      "period": "2026-01",
+      "outcome_total": 45231.12,
+      "baseline_average": 32145.50,
+      "increase_ratio": 0.4065
+    }
+  ]
+  ```
+- Returns an empty list `[]` when no spikes exceed the threshold — the API **already handles the empty case** by returning `[]`.
+- The alert detection uses the aggregate outcome of ALL previous periods (not just the previous 3), then compares each period's outcome against that ALL-periods average.
+
+**Frontend AS-IS fetch pattern:**
+- Not fetched. No alerts table component exists.
+
+**Mismatches found (resolved in spec):**
+1. **⚠️ CRITICAL — PM says "rolling average of the previous 3 periods"** but the backend `detect_outcome_alerts()` computes the average of ALL historical outcomes since the beginning, not a sliding window of 3 periods. This is a **backend logic gap**: the API needs a new query parameter (e.g. `window_size=3`) or the backend logic must be changed. The spec must call this out as a backend change needed.
+2. **PM says threshold range 0.01–1.0** but the backend only enforces `ge=0` (no upper bound). The spec should tighten this to `ge=0.01, le=1.0`.
+3. **PM says "recorded outcome"** but the API field is `outcome_total`. Acceptable field name mismatch — spec will use `outcome_total`.
+4. **PM says "rolling average of the previous 3 periods"** and API field is `baseline_average` — the semantics differ. Spec to note: rename to `rolling_average` after backend fix, or accept `baseline_average` with a comment.
+5. **PM says "percentage increase"** but the API returns `increase_ratio` (a decimal like 0.4065). The spec should clarify that the frontend formats `increase_ratio` as a percentage (e.g. 40.7%).
+
+### Feature 3 — B2B vs B2C comparison view
+
+**PM requirement:**
+- New page in the dashboard for comparing B2B vs B2C.
+- Two side-by-side sections, each with a table of top 5 income categories: category name, total income, percentage of group total.
+- Below both sections, a chart comparing total income of B2B vs B2C visually.
+- User can filter by date range (`YYYY-MM-DD`).
+- Available categories must come from the facets endpoint.
+
+**AS-IS API — `GET /api/metrics/categories/top`**
+- Query params: `operation_type` (default="outcome"), `limit` (default=5, ge=1, le=20), `start_date`, `end_date`, `business_type`.
+- Response shape:
+  ```json
+  [
+    {
+      "category": "sales",
+      "operation_type": "income",
+      "total_amount": 452312.50
+    }
+  ]
+  ```
+
+**AS-IS API — `GET /api/metrics/facets`** (for available categories)
+- Returns `categories: ["administrative", "operational", "others", "sales", "suppliers"]` and `business_types: ["B2B", "B2C"]`.
+
+**Frontend AS-IS fetch pattern:**
+- Neither endpoint is currently called.
+- No routing exists (`react-router-dom` is not a dependency).
+- No B2B/B2C page or components exist.
+
+**Mismatches found (resolved in spec):**
+
+1. **PM says "percentage of the group total"** — the API returns raw `total_amount` but not the percentage. The frontend must compute the percentage from the sum of all returned categories' `total_amount`, or the backend needs a new field. **Decision**: spec will have the frontend compute the percentage from the API response since the sum of top 5 is available client-side. The spec should note this is approximate if the 5 categories don't sum to the full group income.
+
+2. **PM says "facets endpoint provides available categories for each group"** — the facets endpoint returns ALL categories, not categories filtered by business type. The frontend can get the full category list but cannot pre-filter by B2B vs B2C from facets alone. The spec should accept this.
+
+3. **PM does not specify a total income comparison chart shape** — the spec should define it as a simple bar chart (B2B bar vs B2C bar) or a single-value comparison.
+
+4. **No dedicated B2B-income-summary endpoint exists** — the spec should use `GET /api/metrics/summary` with `business_type=B2B` + `operation_type=income` for the B2B total, and same for B2C. Alternatively use the categories/top endpoint with `business_type` filter and aggregate from there. The spec will define which approach to use.
+
+5. **Routing needed** — `react-router-dom` must be added to `package.json` to create a new page separate from the home dashboard.
+
+### Summary of all API→PM mismatches
+
+| # | Feature | PM wording | Actual API behavior | Resolution |
+|---|---------|-----------|-------------------|-----------|
+| 1 | F2 — Alerts | "rolling average of the previous 3 periods" | Average of ALL historical periods, not a sliding window | **Backend change needed**: add `window_size` param to `detect_outcome_alerts` |
+| 2 | F2 — Alerts | "threshold between 0.01 and 1.0" | Backend accepts `ge=0` (no upper bound) | **Backend change needed**: tighten to `ge=0.01, le=1.0` |
+| 3 | F2 — Alerts | "percentage increase" column | API returns `increase_ratio` (decimal) | Frontend formats as percentage |
+| 4 | F2 — Alerts | "recorded outcome" column | API field is `outcome_total` | Acceptable name difference |
+| 5 | F3 — B2B/B2C | "percentage of the group total" | API returns `total_amount` only | Frontend computes percentage client-side |
+| 6 | F3 — B2B/B2C | "single chart compares total income" | No dedicated endpoint for B2B vs B2C total income side by side | Spec will define using summary endpoint with business_type filter |
+
 ## Integration work still needed
 
 1. **Choose one API connection strategy.** Either keep direct browser requests and set `VITE_API_BASE_URL` to the host-reachable API origin (`http://localhost:8001` in this Compose setup), or use relative paths such as `/api/metrics` so Vite proxies them to `backend:8000`. Do not put the internal Compose hostname in browser configuration.
