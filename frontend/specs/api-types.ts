@@ -1,9 +1,9 @@
 /**
  * @file API response type definitions for the Financial Metrics Dashboard.
  *
- * All types are derived from the OpenAPI spec served at /docs and verified
- * against live backend responses. Every property includes JSDoc for semantics,
- * valid values, and format constraints.
+ * Response shapes are derived from the OpenAPI spec served at /docs. Runtime
+ * behavior and constraints not expressed by OpenAPI are identified separately
+ * in the JSDoc rather than encoded as schema guarantees.
  *
  * Backend base URL: http://localhost:8001
  * OpenAPI endpoint: /docs (OAS 3.1, "Financial Metrics API 0.1.0")
@@ -72,17 +72,14 @@ export type GroupBy = "day" | "week" | "month";
  * }
  */
 export interface FacetsResponse {
-  /** All operation types present in the dataset. Always `["income", "outcome"]`. */
-  readonly operation_types: [OperationType, OperationType];
+  /** Operation types present in the dataset. OpenAPI defines this as an array. */
+  readonly operation_types: readonly OperationType[];
 
-  /** All business types present in the dataset. Always `["B2B", "B2C"]`. */
-  readonly business_types: [BusinessType, BusinessType];
+  /** Business types present in the dataset. OpenAPI defines this as an array. */
+  readonly business_types: readonly BusinessType[];
 
-  /**
-   * All movement categories present in the dataset.
-   * Ordered alphabetically.  Maximum 5 entries.
-   */
-  readonly categories: Category[];
+  /** Available categories; OpenAPI defines an array, and the current dataset has up to five. */
+  readonly categories: readonly Category[];
 
   /**
    * Earliest movement date in the dataset.
@@ -125,10 +122,7 @@ export interface AlertEntry {
    */
   readonly period: string;
 
-  /**
-   * Total outcome (expenditure) recorded during this period, in USD.
-   * Always a positive number rounded to 2 decimal places.
-   */
+  /** Current backend returns positive totals rounded to 2 decimals; OpenAPI specifies only number. */
   readonly outcome_total: number;
 
   /**
@@ -139,12 +133,7 @@ export interface AlertEntry {
    */
   readonly baseline_average: number;
 
-  /**
-   * The fractional increase above the baseline.
-   * Calculated as: `(outcome_total - baseline_average) / baseline_average`.
-   * Always positive.  Display as percentage (e.g. 0.5597 → 55.97%).
-   * Rounded to 4 decimal places.
-   */
+  /** Fractional increase; current backend rounds to 4 decimals. OpenAPI specifies only number. */
   readonly increase_ratio: number;
 }
 
@@ -184,11 +173,7 @@ export interface CategoryEntry {
    */
   readonly operation_type: OperationType;
 
-  /**
-   * Total amount aggregated for this category, in USD.
-   * Sum of all movements matching the requested `operation_type`
-   * (and `business_type` if provided), rounded to 2 decimal places.
-   */
+  /** Current backend rounds this aggregate to 2 decimals; OpenAPI specifies only number. */
   readonly total_amount: number;
 }
 

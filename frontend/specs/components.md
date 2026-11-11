@@ -2,7 +2,7 @@
 
 > Branch: `feature/frontend-specs`  
 > Status: **draft** — aligned with `api-types.ts` and `param-types.ts`  
-> Verified: `tsc --noEmit --strict` (0 errors)
+> Type-check: the specification types are checked directly; the app project is checked with `npx tsc -b`.
 
 ---
 
@@ -33,7 +33,7 @@ Add `react-router-dom` and define two top-level routes:
 | `/` | `HomePage` | Current dashboard + Feature 1 date filter + Feature 2 alerts table |
 | `/b2b-b2c` | `B2bB2cPage` | Feature 3 — B2B vs B2C comparison view |
 
-Navigation should be added to the dashboard header for switching between pages. Use `<Link>` or a simple nav bar — no nested layouts needed for this scope.
+Render the two navigation links in the shared dashboard header using React Router `<Link>` components. Do not add an `onNavigate` callback; route navigation belongs to the router.
 
 ```tsx
 // Conceptual route definition (not part of the component props below)
@@ -62,28 +62,33 @@ Navigation should be added to the dashboard header for switching between pages. 
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `minDate` | `string` | yes | `min_date` from facets — format `YYYY-MM-DD` |
-| `maxDate` | `string` | yes | `max_date` from facets — format `YYYY-MM-DD` |
+| `minDate` | `string \| undefined` | yes | `min_date` from facets — format `YYYY-MM-DD`; `undefined` if facets fail |
+| `maxDate` | `string \| undefined` | yes | `max_date` from facets — format `YYYY-MM-DD`; `undefined` if facets fail |
 | `startDate` | `string \| undefined` | yes | Controlled value for the start input |
 | `endDate` | `string \| undefined` | yes | Controlled value for the end input |
 | `onStartDateChange` | `(value: string \| undefined) => void` | yes | Called when start date changes; `undefined` when cleared |
 | `onEndDateChange` | `(value: string \| undefined) => void` | yes | Called when end date changes; `undefined` when cleared |
+| `rangeError` | `string \| null` | yes | Validation message when the proposed range is invalid; `null` when valid |
 
-**Notes:**
-- Both `<input type="date">` elements use `min` / `max` HTML attributes from `minDate`/`maxDate`.
-- When the user clears an input, the value passed to the callback is `undefined`.
-- No "Apply" button — the filter applies **on change** (debounced? — see ambiguity 6.1).
+**Behavior:**
+- When facets are available, both inputs are bounded by the dataset range. The start input's maximum is the selected end date (or `maxDate`); the end input's minimum is the selected start date (or `minDate`).
+- If facets fail, keep both inputs usable without date bounds or an available-range hint; movement fetching remains independent and continues to work.
+- Clearing either input calls its callback with `undefined`. With both inputs empty, omit both query parameters and show the full dataset.
+- With only `startDate`, show movements from that date through the available upper bound. With only `endDate`, show movements from the available lower bound through that date.
+- Equal start and end dates mean that single calendar day. If a change would make start later than end, reject it, retain the previous valid value, show an inline validation message, and do not fetch until the range is valid.
+- Render `rangeError` beside the inputs when non-null.
+- Apply each valid change immediately, without debounce. If facets are unavailable and a valid date outside the dataset is entered, show the normal no-data state.
 
 #### Modified: `DashboardHeader`
 
-Add an optional `onNavigate` prop or render navigation links here. The period badge should show the selected date range when filtering is active.
+Render navigation links to `/` and `/b2b-b2c` here. The period badge reflects the current date filter: both dates, `From {startDate}`, `Through {endDate}`, or `All available dates` when both are empty.
 
-| Additional Prop | Type | Required | Description |
+| Prop | Type | Required | Description |
 |---|---|---|---|
-| `startDate?` | `string` | no | When set, overrides the fixed period label |
-| `endDate?` | `string` | no | When set, overrides the fixed period label |
+| `startDate?` | `string` | no | Inclusive selected start date |
+| `endDate?` | `string` | no | Inclusive selected end date |
 
-If both are present, the badge reads `"2026-01-01 — 2026-06-30"` instead of `"2024 - Full Year"`.
+If both are present, the badge reads `"2026-01-01 — 2026-06-30"`; never display the stale hard-coded `"2024 - Full Year"` label.
 
 #### Modified: `App.tsx` → `HomePage`
 
@@ -95,6 +100,18 @@ The current `App.tsx` becomes `HomePage`. Changes:
 4. Pass `DateRangeFilter` component to the render tree.
 5. Pass the alerts table (Feature 2) below the charts.
 6. Convert to a named export so the router can use it.
+
+**Props:** none. `HomePage` owns the facet, date, movement, threshold, and alert state. Keep the facet, movement, and alert requests' loading/error states independent. If the movement response is `[]`, pass `metrics={null}` to `KPIRow` so its existing null state renders `—`; pass an empty `MonthlyDataPoint[]` to both charts so they render their existing "No data available to display" state. A movement request error uses the page error banner; an alert request error affects only `AlertsTable`.
+
+#### Reused dashboard components
+
+These existing components remain in use and their public props are part of the feature contract:
+
+| Component | Props | Conditional rendering |
+|---|---|---|
+| `KPIRow` | `metrics: KPIMetrics \| null`; `loading?: boolean` | Loading renders KPI skeletons; `metrics === null` renders `—` values; otherwise render computed metrics. |
+| `IncomeOutcomeChart` | `data: MonthlyDataPoint[]`; `loading?: boolean` | Loading renders a chart skeleton; no positive income/outcome values renders "No data available to display"; otherwise render the chart. |
+| `ProfitPercentChart` | `data: MonthlyDataPoint[]`; `loading?: boolean` | Loading renders a chart skeleton; no nonzero margin values renders "No data available to display"; otherwise render the chart. |
 
 **Data flow for date filter:**
 
@@ -132,7 +149,7 @@ HomePage
 | `threshold` | `number` | yes | Current threshold value (0.01 – 1.0) |
 | `onThresholdChange` | `(value: number) => void` | yes | Called when the user changes the threshold input |
 
-Renders a labelled `<input type="number" min={0.01} max={1.0} step={0.01}>` with the current threshold value. Displayed above the alerts table.
+Renders a labelled `<input type="number" min={0.01} max={1.0} step={0.01}>` above the alerts table. Keep an editable draft string so the user can clear or type intermediate values. Commit and call `onThresholdChange` only for finite values in `[0.01, 1.0]` on 0.01 increments; otherwise retain the last committed threshold, show an inline validation message, and do not fetch. HTML `min`, `max`, and `step` attributes alone do not clamp or prevent invalid input.
 
 #### `AlertsTable`
 
@@ -148,17 +165,17 @@ Renders a labelled `<input type="number" min={0.01} max={1.0} step={0.01}>` with
 |---|---|---|
 | Period | `alert.period` | Raw string (e.g. `"2026-03"`) |
 | Recorded Outcome | `alert.outcome_total` | `formatCurrency()` — `$88,077` |
-| Rolling Average (3 periods) | `alert.baseline_average` | `formatCurrency()` — `$51,426` |
+| Rolling Average | `alert.baseline_average` | `formatCurrency()` — `$51,426` |
 | Increase % | `alert.increase_ratio` | `(increase_ratio * 100).toFixed(1) + "%"` — `"56.0%"` |
 
-**States:**
+**States (evaluated in this precedence):**
 
 | State | Rendering |
 |---|---|
 | `loading === true` | 4 skeleton rows via `<Skeleton>` |
-| `error !== null` | Red error banner: "Failed to load anomaly alerts." |
-| `alerts.length === 0 && !loading && !error` | Centered italic text: "No anomalies detected for the current threshold." |
-| `alerts.length > 0` | Full table rendering |
+| `error != null` | Red error banner: "Failed to load anomaly alerts." |
+| `alerts.length === 0 && !loading && error == null` | Centered italic text: "No anomalies detected for the current threshold." |
+| `alerts.length > 0 && error == null` | Full table rendering |
 
 **Notes:**
 - **PM ambiguity resolved (see 6.2):** The PM says "rolling average of the previous 3 periods" but the backend computes an average of ALL historical periods. The spec tables this mismatch — the component displays whatever `baseline_average` returns and labels it "Rolling Average". The column name deliberately omits "3 periods" until the backend is fixed.
@@ -183,13 +200,10 @@ Renders a labelled `<input type="number" min={0.01} max={1.0} step={0.01}>` with
 
 Page-level component. Responsibilities:
 
-1. Fetch facets on mount for available categories and date range hints.
+1. Fetch facets on mount for the available date range hint and the global list of valid category values. Facets categories are not business-line-specific; table rows and ranking come from each top-category response. A facets failure does not block the two category tables or summary requests.
 2. Maintain `startDate` / `endDate` state.
 3. Fetch two `GET /api/metrics/categories/top?operation_type=income&limit=5&business_type=B2B` calls — one for B2B, one for B2C.
-4. Compute the grand total income for each group:
-   - Option A: Use `GET /api/metrics/summary?operation_type=income&business_type=B2B` (backend does the aggregation).
-   - Option B: Compute from the categories/top response (less accurate if categories < 5).
-   - **Decision (see 6.4):** Use Option A (`/api/metrics/summary`) for the grand total, because the top-5 may not represent 100% of income.
+4. Compute each grand total by summing `income` across the matching `/api/metrics/summary` response. This is the source for percentages and chart values; do not derive it from top categories.
 5. Pass data down to child components.
 
 | Prop | Type | Required | Description |
@@ -217,9 +231,10 @@ B2bB2cPage
 |---|---|---|---|
 | `title` | `string` | yes | Section title: `"B2B"` or `"B2C"` |
 | `entries` | `CategoryEntry[]` | yes | Top categories for this business line |
-| `groupTotal` | `number` | yes | Total income for this business line (from summary endpoint) |
+| `groupTotal` | `number \| null` | yes | Total income for this business line; `null` if the summary request failed |
 | `loading` | `boolean` | yes | Skeleton state |
 | `error` | `string \| null` | no | Error state |
+| `summaryError` | `string \| null` | no | Summary request failure; show category rows but render percentages as `—` |
 
 **Columns:**
 
@@ -227,22 +242,25 @@ B2bB2cPage
 |---|---|---|
 | Category | `entry.category` | Capitalized: `"Sales"` |
 | Total Income | `entry.total_amount` | `formatCurrency()` — `$557,904` |
-| % of Group Total | `entry.total_amount / groupTotal * 100` | `(pct).toFixed(1) + "%"` — `"90.6%"` |
+| % of Group Total | `entry.total_amount / groupTotal * 100` | One decimal place; render `—` if `groupTotal` is unavailable or zero |
 
-**States:**
+**States (evaluated in this precedence):**
 - `loading`: 5 skeleton rows.
-- `error`: inline error message.
-- `entries.length === 0 && !loading && !error`: "No income data for this business line."
+- `error != null`: inline error for this business line; do not hide the other business line.
+- `entries.length === 0 && !loading && error == null`: "No income data for this business line."
+- Entries with a failed summary request still render; percentage cells show `—` and a separate summary error is shown.
+- A zero `groupTotal` never causes division. If rows are present despite a zero total, render `—` for their percentages.
 
 #### `B2bB2cComparisonChart`
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `b2bTotal` | `number` | yes | Total income from B2B line |
-| `b2cTotal` | `number` | yes | Total income from B2C line |
+| `b2bTotal` | `number \| null` | yes | Total income from B2B line; `null` if unavailable |
+| `b2cTotal` | `number \| null` | yes | Total income from B2C line; `null` if unavailable |
 | `loading` | `boolean` | yes | Skeleton state |
+| `error` | `string \| null` | no | Summary error when either group's total failed; render an inline chart error instead of bars |
 
-**Visual:** A simple bar chart (Recharts `<BarChart>`) with two bars — "B2B Income" and "B2C Income". Y-axis formatted in dollars. Tooltip shows formatted currency.
+**Visual and states:** A Recharts `<BarChart>` with two bars — "B2B Income" and "B2C Income". Format the Y-axis and tooltip as currency. While loading, show a skeleton; on summary error, show an inline error and no chart; when both totals are zero, show the chart with two zero bars and an explicit no-income caption.
 
 ---
 
@@ -283,11 +301,17 @@ Inline error banners use the existing pattern from `App.tsx`:
 </div>
 ```
 
-### 5.3 Loading display
+### 5.3 Page-level request states
+
+- `HomePage` keeps facets, movement, and alert loading/error states independent. Facets failure removes date bounds/hint only; movement failure affects dashboard data; alert failure affects only the alerts table.
+- `B2bB2cPage` keeps category and summary requests independent for B2B and B2C. A failure in one group's category request must not hide the other group's table. A summary failure leaves category rows visible with percentage `—`; the comparison chart shows its own error if either total is unavailable.
+- `DateRangeFilter` remains usable if facets fail. A failed data request is distinct from a successful empty response; show an error for the former and the feature-specific empty state for the latter.
+
+### 5.4 Loading display
 
 Skeleton components from `@/components/ui/skeleton` are used for loading states. Each data-driven component accepts `loading?: boolean`.
 
-### 5.4 Empty state
+### 5.5 Empty state
 
 When data is an empty array `[]` and the component is not loading or errored, a centred italic message is displayed:
 ```tsx

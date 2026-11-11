@@ -2,8 +2,8 @@
  * @file Query-parameter type definitions for the Financial Metrics Dashboard API.
  *
  * Every type in this file corresponds to the query parameters accepted by one
- * or more backend endpoints.  All types are derived from the OpenAPI spec at
- * /docs and verified against live responses.
+ * or more backend endpoints. Types are derived from the OpenAPI spec at
+ * `/docs`; UI-only constraints that are stricter than the backend are called out.
  *
  * Backend base URL: http://localhost:8001
  * OpenAPI endpoint: /docs (OAS 3.1, "Financial Metrics API 0.1.0")
@@ -17,8 +17,8 @@
  * Optional date-range filter accepted by several endpoints.
  *
  * When both fields are omitted the endpoint returns data for the full
- * available period.  The backend accepts `null` or absent values for
- * each field independently.
+ * available period. Omit an unset field from the query string; an empty
+ * string is not a valid ISO date.
  */
 export interface DateRangeFilter {
   /**
@@ -26,7 +26,7 @@ export interface DateRangeFilter {
    * Format: `YYYY-MM-DD` (ISO 8601 calendar date).
    * Example: `"2026-01-01"`
    *
-   * When `undefined` or empty the range has no lower bound.
+   * When `undefined`, omit the parameter to leave the range without a lower bound.
    */
   readonly start_date?: string;
 
@@ -35,7 +35,7 @@ export interface DateRangeFilter {
    * Format: `YYYY-MM-DD` (ISO 8601 calendar date).
    * Example: `"2026-12-31"`
    *
-   * When `undefined` or empty the range has no upper bound.
+   * When `undefined`, omit the parameter to leave the range without an upper bound.
    */
   readonly end_date?: string;
 }
