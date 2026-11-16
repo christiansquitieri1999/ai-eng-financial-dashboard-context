@@ -46,6 +46,12 @@ Detailed rationale and intended bounded application: [README — Third skill](./
 
 Detailed record: [README — Internal skill draft](./README.md#internal-skill-draft-2026-11-16).
 
+## Follow-up live accessibility audit
+
+- Backend API was live during the rendered-page audit; dashboard data loaded successfully. The accessibility tree exposed named chart images with associated monthly data tables, KPI and chart regions, and a loaded status. An API failure path had previously been verified to expose an alert and failure status.
+- Reproduced the skip-link visibility problem under the browser's `prefers-reduced-motion: reduce` setting: the global reduced-motion rule forces a short transition, so the link's `top` remained `-40px` while focus-visible during the transition. Added `transition: none` to `.skip-link` so it can reveal immediately; CSS diagnostics are clean. A keyboard Tab check at 1440px showed the focused link at y=0 with a 178.6 × 40px rectangle. The browser keyboard sequence at 320px was inconsistent and did not reliably establish focus, so small-viewport keyboard reachability/Enter activation remains **NOT VERIFIED**.
+- Validation after the CSS change: frontend build **PASS** (Vite produced no warnings), lint **PASS**, tests **PASS** (20 tests in 3 files). No axe/Lighthouse scan was run in this follow-up; do not claim a complete WCAG audit.
+
 ## Working state
 
 - Uncommitted: `memory-bank/README.md` (modified), `memory-bank/progress.md` and `.skills/` (untracked).
