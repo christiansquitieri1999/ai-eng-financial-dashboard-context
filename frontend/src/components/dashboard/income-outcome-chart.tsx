@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { ChartSkeleton } from './chart-skeleton'
 import { type MonthlyDataPoint } from '@/lib/financial-types'
-import { formatCurrency } from '@/lib/financial-utils'
+import { formatCurrency, formatMonthRangeLabel } from '@/lib/financial-utils'
 import {
   LineChart,
   Line,
@@ -57,6 +57,7 @@ export function IncomeOutcomeChart({ data, loading }: IncomeOutcomeChartProps) {
   }
 
   const hasData = data.some((d) => d.income > 0 || d.outcome > 0)
+  const periodLabel = formatMonthRangeLabel(data)
 
   return (
     <Card className="border-border/60">
@@ -72,7 +73,7 @@ export function IncomeOutcomeChart({ data, loading }: IncomeOutcomeChartProps) {
         ) : (
                   /* Skill §Image alternative (4.1.2 / 1.1.1): named role="img", not
                      focusable (fixes 1+2); sr-only data table fallback (fix 8) */
-                  <div role="img" aria-label="Line chart comparing monthly income and outcome from December 2025 to October 2026">
+                  <div role="img" aria-label={`Line chart comparing monthly income and outcome ${periodLabel}`}>
                     <ResponsiveContainer width="100%" height={280}>
                       <LineChart
                         data={data}

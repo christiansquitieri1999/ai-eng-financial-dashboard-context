@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { ChartSkeleton } from './chart-skeleton'
 import { type MonthlyDataPoint } from '@/lib/financial-types'
+import { formatMonthRangeLabel } from '@/lib/financial-utils'
 import {
   LineChart,
   Line,
@@ -58,6 +59,7 @@ export function ProfitPercentChart({ data, loading }: ProfitPercentChartProps) {
   }
 
   const hasData = data.some((d) => d.profitPercent !== 0)
+  const periodLabel = formatMonthRangeLabel(data)
 
   return (
     <Card className="border-border/60">
@@ -73,7 +75,7 @@ export function ProfitPercentChart({ data, loading }: ProfitPercentChartProps) {
         ) : (
                   /* Skill §Image alternative (4.1.2 / 1.1.1): named role="img", not
                      focusable (fixes 1+2); sr-only data table fallback (fix 8) */
-                  <div role="img" aria-label="Line chart of monthly profit margin percentage from December 2025 to October 2026">
+                  <div role="img" aria-label={`Line chart of monthly profit margin percentage ${periodLabel}`}>
                     <ResponsiveContainer width="100%" height={280}>
                       <LineChart
                         data={data}
