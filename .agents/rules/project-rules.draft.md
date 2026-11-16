@@ -164,9 +164,9 @@ Applies when adding a filter, a query parameter, a path segment, or a client typ
 - **Status:** PROPOSED · **Severity:** Low
 - **Scope:** `frontend/src/lib/financial-types.ts`, `backend/app/routes.py`
 - **Rule:** When an API constrains one field by another, the client type must not accept combinations the API cannot emit.
-- **Why:** `FinancialMovement` types `category` and `operation_type` independently, so `{ operation_type: "outcome", category: "sales" }` compiles, yet `_build_movement` only emits `sales` for income and draws outcomes from `OUTCOME_CATEGORIES`. Fixtures and UI filters can encode impossible states that no layer rejects at runtime.
-- **In practice:** a discriminated union keyed on `operation_type` expresses the constraint the API already enforces.
-- **Validated:** a probe object `{ operation_type: "outcome", category: "sales" }` and its mirror `{ operation_type: "income", category: "suppliers" }` both compile with **exit 0** against `tsconfig.app.json`, while the reachable combination compiles alongside them. TypeScript cannot tell the three apart, so the type gives no protection here.
+- **Why:** `FinancialMovement` previously typed `category` and `operation_type` independently, so incompatible pairs were representable. The backend generator emits `sales` or `others` for income and draws outcome categories from `OUTCOME_CATEGORIES`; Pydantic's broader `Category` alias alone does not encode that cross-field constraint.
+- **In practice:** a discriminated union keyed on `operation_type` expresses the observed generator contract; a runtime guard at the JSON boundary is still needed because TypeScript types are erased.
+- **Validated:** `frontend/src/lib/financial-types.ts` now uses that union, and `financial-validation.ts` rejects malformed JSON, invalid ISO calendar dates, non-finite amounts, and income/outcome category mismatches. Vitest covers valid and invalid payloads; `npm run build` verifies TypeScript project references rather than the root solution config.
 - **Validated — the check itself is easy to get wrong:** `npx tsc --noEmit` in `frontend/` **checks nothing**, because the root `tsconfig.json` is a solution file (`"files": []` plus `references`). It exits 0 on any input. A type-level rule must be verified with `npx tsc --noEmit -p tsconfig.app.json`, or with `npm run build`, which runs `tsc -b`.
 
 ---

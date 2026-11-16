@@ -66,6 +66,13 @@ export function computeMonthlyData(
     });
 }
 
+export function formatMonthRangeLabel(
+  data: readonly Pick<MonthlyDataPoint, "month">[],
+): string {
+  if (data.length === 0) return "for the selected period";
+  return `from ${data[0].month} to ${data[data.length - 1].month}`;
+}
+
 export function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",

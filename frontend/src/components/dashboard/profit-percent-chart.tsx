@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
+import { ChartSkeleton } from './chart-skeleton'
 import { type MonthlyDataPoint } from '@/lib/financial-types'
+import { formatMonthRangeLabel } from '@/lib/financial-utils'
 import {
   LineChart,
   Line,
@@ -50,19 +51,15 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
 export function ProfitPercentChart({ data, loading }: ProfitPercentChartProps) {
   if (loading) {
     return (
-      <Card className="border-border/60">
-        <CardHeader className="pb-4">
-          <Skeleton className="h-5 w-52" />
-          <Skeleton className="h-3 w-64 mt-1" />
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-[280px] w-full rounded-lg" />
-        </CardContent>
-      </Card>
+      <ChartSkeleton
+        title="Profit Margin %"
+        description="Monthly profit as a percentage of total income"
+      />
     )
   }
 
   const hasData = data.some((d) => d.profitPercent !== 0)
+  const periodLabel = formatMonthRangeLabel(data)
 
   return (
     <Card className="border-border/60">
@@ -76,8 +73,16 @@ export function ProfitPercentChart({ data, loading }: ProfitPercentChartProps) {
             No data available to display
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                  /* Skill §Image alternative (4.1.2 / 1.1.1): named role="img", not
+                     focusable (fixes 1+2); sr-only data table fallback (fix 8) */
+                  <div role="img" aria-label={`Line chart of monthly profit margin percentage ${periodLabel}`}>
+                    <ResponsiveContainer width="100%" height={280}>
+                      <LineChart
+                        data={data}
+                        margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+                        role="presentation"
+                        tabIndex={-1}
+                      >
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.6} />
               <XAxis
                 dataKey="month"
@@ -105,8 +110,27 @@ export function ProfitPercentChart({ data, loading }: ProfitPercentChartProps) {
                 activeDot={{ r: 5, strokeWidth: 0 }}
               />
             </LineChart>
-          </ResponsiveContainer>
+                          </ResponsiveContainer>
+                      </div>
         )}
+                    {/* Skill §Image alternative: data accessible to screen readers */}
+                    <table className="sr-only">
+                      <caption>Profit Margin % — monthly data</caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">Month</th>
+                          <th scope="col">Profit margin</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.map((d) => (
+                          <tr key={d.month}>
+                            <th scope="row">{d.month}</th>
+                            <td>{d.profitPercent.toFixed(1)}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
       </CardContent>
     </Card>
   )
