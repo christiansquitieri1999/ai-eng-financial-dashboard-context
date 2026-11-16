@@ -1,14 +1,25 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { KPIRow } from "@/components/dashboard/kpi-row";
-import { IncomeOutcomeChart } from "@/components/dashboard/income-outcome-chart";
-import { ProfitPercentChart } from "@/components/dashboard/profit-percent-chart";
+import { ChartErrorBoundary } from "@/components/dashboard/chart-error-boundary";
+import { ChartSkeleton } from "@/components/dashboard/chart-skeleton";
 import {
   type FinancialMovement,
   type KPIMetrics,
   type MonthlyDataPoint,
 } from "@/lib/financial-types";
 import { computeKPIs, computeMonthlyData } from "@/lib/financial-utils";
+
+const IncomeOutcomeChart = lazy(() =>
+  import("@/components/dashboard/income-outcome-chart").then((module) => ({
+    default: module.IncomeOutcomeChart,
+  })),
+);
+const ProfitPercentChart = lazy(() =>
+  import("@/components/dashboard/profit-percent-chart").then((module) => ({
+    default: module.ProfitPercentChart,
+  })),
+);
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8001";
   
@@ -73,11 +84,33 @@ function App() {
 
           <section
             aria-label="Financial charts"
-                aria-busy={loading}
+            aria-busy={loading}
             className="grid grid-cols-1 gap-4 xl:grid-cols-2"
           >
-            <IncomeOutcomeChart data={monthlyData} loading={loading} />
-            <ProfitPercentChart data={monthlyData} loading={loading} />
+            <ChartErrorBoundary title="Income vs. Outcome">
+              <Suspense
+                fallback={
+                  <ChartSkeleton
+                    title="Income vs. Outcome"
+                    description="Monthly revenue and expenditure evolution"
+                  />
+                }
+              >
+                <IncomeOutcomeChart data={monthlyData} loading={loading} />
+              </Suspense>
+            </ChartErrorBoundary>
+            <ChartErrorBoundary title="Profit Margin %">
+              <Suspense
+                fallback={
+                  <ChartSkeleton
+                    title="Profit Margin %"
+                    description="Monthly profit as a percentage of total income"
+                  />
+                }
+              >
+                <ProfitPercentChart data={monthlyData} loading={loading} />
+              </Suspense>
+            </ChartErrorBoundary>
           </section>
         </div>
       </div>

@@ -1,6 +1,6 @@
 # Project Memory Bank
 
-**Status checked:** 2026-11-03
+**Status checked:** 2026-11-16
 **Purpose:** evidence-backed working context for contributors and coding agents. This is a snapshot of the repository, not a product specification or an approved roadmap. Update it when source, configuration, or verified test results change.
 
 ## Product Overview
@@ -42,13 +42,25 @@ The following checks were run against this checkout while preparing this snapsho
 
 - `python -m pytest backend/tests/test_routes.py -q`: **15 passed**.
 - `python -m pytest .agents/rules/_validation/test_rules_validation.py -q`: **6 passed, 6 xfailed**. The expected failures are strict defect probes, not ordinary passing product tests.
-- Frontend product suite: **1 file, 5 tests** with `npx vitest run` from `frontend/`.
+- Frontend product suite: **1 file, 5 tests** with `npx vitest run src/lib/financial-utils.test.ts` from `frontend/`. The broader default `npm test` also discovers `frontend/validation/r13-error-handling.test.ts`; its test expecting the old Spanish error text currently fails against the English UI copy.
 - Relocated frontend evidence probes: **2 files, 7 tests** with `npx vitest run --dir ../.agents/rules/_validation` from `frontend/`.
 - `npx tsc --noEmit -p tsconfig.app.json`, `npx tsc -b`, and `npx eslint .` passed in the last recorded frontend verification.
 - The validation scripts report 25 R-rules and 8 C-conventions, with no missing rule IDs in their index.
 - `docker compose config --quiet` and `docker compose build` succeeded; both development services started with `docker compose up -d`.
 - Runtime smoke tests passed: backend `/health` returns `ok`; backend and Vite-proxied `/api/metrics` each return 360 movements; frontend `/` returns HTTP 200. The running backend image contains pytest 9.2.0 and debugpy 1.8.22.
 - `backend/.dockerignore` and `frontend/.dockerignore` exclude local dependencies, caches, and env files from image contexts. Their measured build contexts were about 898 B and 1.75 kB respectively.
+- The frontend performance review on 2026-11-16 applied literal `React.lazy` imports for both Recharts views and kept chart/KPI loading placeholders dimensionally aligned with rendered content. It also added a static HTML description meta tag. `npm run lint`, `npx tsc --noEmit -p tsconfig.app.json`, and the focused product test (`npx vitest run src/lib/financial-utils.test.ts`, 5 tests) passed. The full `npm test` command reported 8 passing and 1 failing test: the existing R13 evidence probe still expects the prior Spanish error string, while `App.tsx` already uses English. The final documented production command, `npm run build` from `frontend/`, passed with no warnings: the entry JavaScript chunk changed from 585.87 kB to 188.52 kB, and the largest generated chunk is 342.30 kB. The prior >500 kB chunk warning disappeared without changing the warning threshold or bundler configuration. These are entry/chunk sizes, not a reduction in total page downloads.
+
+### Frontend delivery-pattern review (2026-11-16)
+
+- **Applied:** Installed skill rule `bundle-dynamic-imports` (with the statically analyzable literal paths recommended by `bundle-analyzable-paths`) through `React.lazy`/`Suspense` for the two chart components. The skill's `next/dynamic` example is Next-specific; this Vite SPA uses React's native lazy loading. Since the charts render on the initial page, this splits them from the entry chunk but does not defer their requests until a user interaction. A chart error boundary logs import/render failures and presents an accessible, fixed-size error state so a failed lazy chunk does not replace the rest of the dashboard.
+- **Applied, as a layout-stability companion:** `async-suspense-boundaries` warns against fallback/content shifts. Suspense and API-loading chart fallbacks now share the same titled card and fixed 280px plot placeholder. KPI labels, icons, and helper text render immediately; only the numeric value uses a placeholder with the same line height as the loaded value, so text wrapping is consistent at different viewport widths. Production-preview browser checks with the API request held and released showed identical loading/loaded chart positions and card heights at widths 1440px and 390px. At 1440px, the previous 27px KPI-region and 8px chart-card height increases were eliminated. This verifies the measured loading transition, not a comprehensive Core Web Vitals/CLS certification.
+- **Metadata:** the existing title, viewport, and favicon remain; a descriptive `<meta name="description">` was added. General page metadata is not a standalone rule in the installed skill.
+- **Not applicable / no change:** no app `<img>` elements or rendered photo assets exist, so `next/image` is unsupported and unnecessary in this Vite SPA (the source `hero.png` is unused; the favicon remains a static SVG link). No custom font file or font network request is present; the Inter-first system font stack falls back locally, so no font swap/layout-shift or font-loading request was found. `server-hoist-static-io` concerns server/route-handler I/O and does not apply to this client-only app. Vite's `type="module"` entry is already non-blocking; no extra script defer/async change or resource hint is warranted.
+- **Not applied:** `bundle-conditional` would load an always-visible chart only after user activation, changing the current initial dashboard behavior; that trade-off is not justified. No Next.js migration, Next-only dependency, image optimization library, font service, vendor chunk override, or warning-threshold change was introduced.
+- **Failure-path verification:** aborting the production income/outcome JavaScript chunk produced a logged chart error and an alert directing the user to reload; KPI values and the profit chart/table remained available. Removing the interception and reloading restored both 12-row chart tables.
+
+Evidence: [app boundaries](../frontend/src/App.tsx), [chart placeholder](../frontend/src/components/dashboard/chart-skeleton.tsx), [chart error boundary](../frontend/src/components/dashboard/chart-error-boundary.tsx), [KPI layout](../frontend/src/components/dashboard/kpi-card.tsx), [HTML metadata](../frontend/index.html), and the installed skill rules [dynamic imports](../.agents/skills/vercel-react-best-practices/rules/bundle-dynamic-imports.md), [analyzable paths](../.agents/skills/vercel-react-best-practices/rules/bundle-analyzable-paths.md), and [Suspense boundaries](../.agents/skills/vercel-react-best-practices/rules/async-suspense-boundaries.md).
 
 The two evidence tests are outside Vitest's `frontend/` root. A plain `npx vitest run` does **not** discover them; the explicit `--dir` command is required. Bare `npx tsc --noEmit` is not a valid project type-check here; use the app project or build command above.
 
