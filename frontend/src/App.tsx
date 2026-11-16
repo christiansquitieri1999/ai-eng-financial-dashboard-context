@@ -9,6 +9,7 @@ import {
   type MonthlyDataPoint,
 } from "@/lib/financial-types";
 import { computeKPIs, computeMonthlyData } from "@/lib/financial-utils";
+import { parseFinancialMovements } from "@/lib/financial-validation";
 
 const IncomeOutcomeChart = lazy(() =>
   import("@/components/dashboard/income-outcome-chart").then((module) => ({
@@ -28,7 +29,8 @@ async function fetchFinancialData(): Promise<FinancialMovement[]> {
   if (!response.ok) {
     throw new Error(`Failed to fetch financial data: ${response.status}`);
   }
-  return response.json();
+  const payload: unknown = await response.json();
+  return parseFinancialMovements(payload);
 }
 
 function App() {

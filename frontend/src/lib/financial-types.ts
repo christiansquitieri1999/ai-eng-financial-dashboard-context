@@ -1,14 +1,24 @@
 export type OperationType = 'income' | 'outcome'
-export type Category = 'suppliers' | 'sales' | 'operational' | 'administrative' | 'others'
+export type IncomeCategory = 'sales' | 'others'
+export type OutcomeCategory = 'suppliers' | 'operational' | 'administrative' | 'others'
+export type Category = IncomeCategory | OutcomeCategory
 export type BusinessType = 'B2B' | 'B2C'
 
-export interface FinancialMovement {
-  create_date: string // ISO date
+interface FinancialMovementBase {
+  create_date: string // ISO calendar date: YYYY-MM-DD
   amount: number
-  operation_type: OperationType
-  category: Category
   business_type: BusinessType
 }
+
+export type FinancialMovement =
+  | (FinancialMovementBase & {
+      operation_type: 'income'
+      category: IncomeCategory
+    })
+  | (FinancialMovementBase & {
+      operation_type: 'outcome'
+      category: OutcomeCategory
+    })
 
 export interface KPIMetrics {
   totalIncome: number

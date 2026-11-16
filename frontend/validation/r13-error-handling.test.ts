@@ -37,20 +37,13 @@ describe("R13 - error preservation and UI language", () => {
     expect(message).not.toContain("response");
   });
 
-  it("uses a language unlike the rest of the UI", () => {
+  it("keeps the error message consistent with the English UI", () => {
     const match = appSource.match(/setError\(\s*\n?\s*"([^"]+)"/);
+    expect(match).not.toBeNull();
     const message = match![1];
 
-    expect(message).toContain("No se pudo cargar");
-    expect(message).toContain("Revisa la API de backend");
-
-    // Every other user-facing string in this file is English.
+    expect(message).toContain("Couldn't load financial data");
+    expect(message).toContain("Check the backend API connection");
     expect(appSource).toContain('period="2024 - Full Year"');
-
-    // The text is unaccented Spanish. Correct Spanish is "información";
-    // the shipped text is "informacion", so even a Spanish-speaking user
-    // reads it as machine-generated.
-    expect(message).toContain("informacion");
-    expect(message).not.toContain("información");
   });
 });
