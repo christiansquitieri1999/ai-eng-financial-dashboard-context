@@ -33,8 +33,9 @@ function App() {
         setMonthlyData(computeMonthlyData(movements));
       })
       .catch(() => {
+              // Skill §Error handling (4.1.3 / 3.1.2): English text, announced via role="alert"
         setError(
-          "No se pudo cargar la informacion financiera. Revisa la API de backend.",
+                "Couldn't load financial data. Check the backend API connection.",
         );
       })
       .finally(() => {
@@ -43,23 +44,36 @@ function App() {
   }, []);
 
   return (
-    <main className="dark min-h-screen bg-background text-foreground">
+    <main id="main-content" tabIndex={-1} className="dark min-h-screen bg-background text-foreground">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-8">
           <DashboardHeader period="2024 - Full Year" />
 
           {error ? (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-foreground">
+                <div
+                  role="alert"
+                  className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-foreground"
+                >
               {error}
             </div>
           ) : null}
 
-          <section aria-label="Key performance indicators">
+              {/* Skill §Live regions: announce loading without moving focus */}
+              <div role="status" aria-live="polite" className="sr-only">
+                {loading
+                  ? "Loading financial metrics…"
+                  : error
+                    ? "Financial metrics failed to load"
+                    : "Financial metrics loaded"}
+              </div>
+
+              <section aria-label="Key performance indicators" aria-busy={loading}>
             <KPIRow metrics={metrics} loading={loading} />
           </section>
 
           <section
             aria-label="Financial charts"
+                aria-busy={loading}
             className="grid grid-cols-1 gap-4 xl:grid-cols-2"
           >
             <IncomeOutcomeChart data={monthlyData} loading={loading} />

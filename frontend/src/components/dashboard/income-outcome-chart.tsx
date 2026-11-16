@@ -75,8 +75,16 @@ export function IncomeOutcomeChart({ data, loading }: IncomeOutcomeChartProps) {
             No data available to display
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                  /* Skill §Image alternative (4.1.2 / 1.1.1): named role="img", not
+                     focusable (fixes 1+2); sr-only data table fallback (fix 8) */
+                  <div role="img" aria-label="Line chart comparing monthly income and outcome from December 2025 to October 2026">
+                    <ResponsiveContainer width="100%" height={280}>
+                      <LineChart
+                        data={data}
+                        margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+                        role="presentation"
+                        tabIndex={-1}
+                      >
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.6} />
               <XAxis
                 dataKey="month"
@@ -116,8 +124,29 @@ export function IncomeOutcomeChart({ data, loading }: IncomeOutcomeChartProps) {
                 activeDot={{ r: 5, strokeWidth: 0 }}
               />
             </LineChart>
-          </ResponsiveContainer>
+                          </ResponsiveContainer>
+                      </div>
         )}
+                    {/* Skill §Image alternative: data accessible to screen readers */}
+                    <table className="sr-only">
+                      <caption>Income vs. Outcome — monthly data</caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">Month</th>
+                          <th scope="col">Income</th>
+                          <th scope="col">Outcome</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.map((d) => (
+                          <tr key={d.month}>
+                            <th scope="row">{d.month}</th>
+                            <td>{formatCurrency(d.income)}</td>
+                            <td>{formatCurrency(d.outcome)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
       </CardContent>
     </Card>
   )
